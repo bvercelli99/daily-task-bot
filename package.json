@@ -1,0 +1,19 @@
+{
+  "name": "daily-time-slackbot",
+  "version": "1.0.0",
+  "description": "A slack bot to input time spent on daily tasks",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bvercelli99/daily-task-bot.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bvercelli99/daily-task-bot/issues"
+  },
+  "homepage": "https://github.com/bvercelli99/daily-task-bot#readme"
+}
