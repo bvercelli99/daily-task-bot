@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS timebot.employee_tasks
 	hours double precision NOT NULL DEFAULT 0,
     description text COLLATE pg_catalog."default",
 	date_created timestamp without time zone,
+  date_deleted timestamp without time zone,
     CONSTRAINT user_tasks_pkey PRIMARY KEY (task_id),
 	CONSTRAINT fk_employees_id FOREIGN KEY (employee_id)
         REFERENCES timebot.employees (employee_id) MATCH SIMPLE

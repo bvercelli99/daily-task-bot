@@ -104,7 +104,10 @@ const getTasksForDateByUserSlackId = (date, slackId) => {
       "WITH employee as ( " +
       "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
       ") " +
-      "SELECT task_id, et.employee_id, system_id, project_id, action_id, hours, description, date_created FROM employee e, timebot.employee_tasks et WHERE et.employee_id = e.employee_id AND date_created > $2", [
+      "SELECT task_id, et.employee_id, system_id, project_id, action_id, hours, description, date_created " +
+      "FROM employee e, timebot.employee_tasks et " +
+      "WHERE et.employee_id = e.employee_id AND date_created = $2 AND et.date_deleted IS NULL " +
+      "ORDER BY task_id ", [
       slackId, date
     ], (error, results) => {
       if (error) {
@@ -116,8 +119,54 @@ const getTasksForDateByUserSlackId = (date, slackId) => {
   });
 };
 
+const addTaskForSlackUser = (slackId, systemId, projectId, actionId, hours, description, date) => {
+  console.log('addTaskForSlackUser: ' + date);
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "WITH employee as ( " +
+      "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
+      ") " +
+      "INSERT INTO timebot.employee_tasks(" +
+      "employee_id, system_id, project_id, action_id, hours, description, date_created) " +
+      "VALUES ((SELECT employee_id FROM employee), $2, $3, $4, $5, $6, $7) RETURNING task_id;", [
+      slackId,
+      systemId,
+      projectId,
+      actionId,
+      hours,
+      description,
+      date
+    ], (error, results) => {
+      if (error) {
+        reject(error);
+      }
+      resolve(results.rows[0].task_id);
+    });
+  });
+};
 
-
+const editTaskForSlackUser = (slackId, systemId, projectId, actionId, description) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "WITH employee as ( " +
+      "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
+      ") " +
+      "INSERT INTO timebot.employee_tasks(" +
+      "employee_id, system_id, project_id, action_id, hours, description, date_created) " +
+      "VALUES ((SELECT employee_id FROM employee), $2, $3, $4, $5, now()) RETURNING task_id;", [
+      slackId,
+      systemId,
+      projectId,
+      actionId,
+      description
+    ], (error, results) => {
+      if (error) {
+        reject(error);
+      }
+      resolve(results.rows[0].task_id);
+    });
+  });
+};
 
 module.exports = {
   getEmployees,
@@ -126,5 +175,7 @@ module.exports = {
   getTasksForDateByUserSlackId,
   getSystems,
   getProjects,
-  getActions
+  getActions,
+  addTaskForSlackUser,
+  editTaskForSlackUser
 }

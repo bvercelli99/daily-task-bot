@@ -17,7 +17,8 @@ let availableProjects = null;
 let availableActions = null;
 
 let activeUsers = {};
-let userViewId = "";
+let userDialogViewIds = {};
+let userHomeViewIds = {};
 
 (async () => {
   // Start your app
@@ -40,7 +41,6 @@ let userViewId = "";
 app.event('app_home_opened', async ({ event, client, body, context }) => {
 
   activeUsers[event.user] = [];
-
 
   //let dbUser = await db.getEmployeeBySlackId(event.user);
   const a = new Date();
@@ -65,6 +65,8 @@ app.event('app_home_opened', async ({ event, client, body, context }) => {
         blocks: getBlocksForUser(event.user, tasks, stringDate)
       }
     });
+
+    userHomeViewIds[event.user] = stringDate;
   }
   catch (error) {
     console.error(error);
@@ -73,14 +75,76 @@ app.event('app_home_opened', async ({ event, client, body, context }) => {
 app.view('view_add', async ({ ack, body, view, client, logger }) => {
   // Acknowledge the view_submission request
   await ack();
+  const system = view['state']['values']['block_system']['!textSystem']['selected_option']["value"];
+  const project = (view['state']['values']['block_project']['!textProject']['selected_option'] === null ? null : view['state']['values']['block_project']['!textProject']['selected_option']["value"]);
+  const action = view['state']['values']['block_action']['!textAction']['selected_option']["value"];
+  const hours = view['state']['values']['block_hours']['action_hours']['value'];
+  const desc = view['state']['values']['block_desc']['action_desc']['value'];
+  const meta = body.view.private_metadata;
+  const taskDate = userHomeViewIds[body.user.id];
+
+  console.log({
+    system, project, action, hours, desc, meta, userHomeViewIds
+  });
 
   //write to db, update current tasks on app_home_opened
+  let newTaskId = await db.addTaskForSlackUser(body.user.id, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), hours, desc, taskDate);
+  let tasks = await db.getTasksForDateByUserSlackId(taskDate, body.user.id);
 
   try {
+    /*
     await client.chat.postMessage({
       channel: body['user']['id'],
       text: "Dude you did it!"
     });
+    */
+    /* view.publish is the method that your app uses to push a view to the Home tab */
+    const result = await client.views.publish({
+
+      /* the user that opened your app's app home */
+      user_id: body.user.id,
+
+      /* the view object that appears in the app home*/
+      view: {
+        type: 'home',
+        callback_id: 'home_view',
+
+        /* body of the view */
+        blocks: getBlocksForUser(body.user.id, tasks, taskDate)
+      }
+    });
+
+  }
+  catch (error) {
+    logger.error(error);
+  }
+});
+
+app.view('view_edit', async ({ ack, body, view, client, logger }) => {
+  // Acknowledge the view_submission request
+  await ack();
+  const system = view['state']['values']['block_system']['!textSystem']['selected_option']["value"];
+  const selectedProjectId = view['state']['values']['block_project']['!textProject']['selected_option'];
+  const project = (selectedProjectId === null ? null : (selectedProjectId["value"] === -1 ? null : selectedProjectId["value"]));
+  const action = view['state']['values']['block_action']['!textAction']['selected_option']["value"];
+  const hours = view['state']['values']['block_hours']['action_hours']['value'];
+  const desc = view['state']['values']['block_desc']['action_desc']['value'];
+  const meta = body.view.private_metadata;
+
+  console.log({
+    system, project, action, hours, desc, meta
+  });
+
+  //write to db to edit existing task, update current tasks on app_home_opened
+  //await db.addTaskForSlackUser(body.user.id,)
+
+  try {
+    /*
+    await client.chat.postMessage({
+      channel: body['user']['id'],
+      text: "Dude you did it!"
+    });
+    */
   }
   catch (error) {
     logger.error(error);
@@ -90,9 +154,6 @@ app.view('view_add', async ({ ack, body, view, client, logger }) => {
 app.action('!addTime', async ({ ack, client, body, logger }) => {
   try {
     await ack();
-    //console.log(availableSystems);
-    //console.log(availableProjects);
-    //console.log(availableActions);
 
     const systems = [];
     for (let sys of availableSystems) {
@@ -130,6 +191,7 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
         blocks: [
           {
             "type": "input",
+            "block_id": "block_system",
             "dispatch_action": true,
             "element": {
               "type": "static_select",
@@ -147,7 +209,9 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
           },
           {
             "type": "input",
-            "dispatch_action": true,
+            "optional": true,
+            "block_id": "block_project",
+            "dispatch_action": false,
             "element": {
               "type": "static_select",
               "action_id": "!textProject",
@@ -172,7 +236,8 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
           },
           {
             "type": "input",
-            "dispatch_action": true,
+            "block_id": "block_action",
+            "dispatch_action": false,
             "element": {
               "type": "static_select",
               "action_id": "!textAction",
@@ -189,6 +254,7 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
           },
           {
             type: 'input',
+            block_id: 'block_hours',
             optional: false,
             label: {
               type: 'plain_text',
@@ -196,12 +262,13 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
             },
             element: {
               type: 'plain_text_input',
+              action_id: 'action_hours',
               multiline: false
             },
           },
           {
             type: 'input',
-            block_id: 'block_inputurl',
+            block_id: 'block_desc',
             optional: true,
             label: {
               type: 'plain_text',
@@ -217,11 +284,14 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
         submit: {
           type: 'plain_text',
           text: 'Add'
-        }
-      }
+        },
+        private_metadata: "adding"
+      },
     });
 
-    userViewId = result.view.id;
+    //
+    userDialogViewIds[body.user.id] = result.view.id;
+    console.log(userDialogViewIds);
 
   } catch (error) {
     logger.error(error);
@@ -231,45 +301,41 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
 app.action('!textSystem', async ({ ack, action, body, client, logger }) => {
   try {
     await ack();
-    console.log(body.user.name + " chose an System - " + action.selected_option.value);
-    /*
-    "initial_option": {
-                "text": {
-                    "type": "plain_text",
-                    "text": "*this is plain_text text*",
-                    "emoji": true
-                },
-                "value": "value-1"
-            },
-    */
+
     //update existing modal view with projects for selected system
     const projBlocks = getProjectBlocksForSystem(parseInt(action.selected_option.value));
     let newBodyBlocks = body.view.blocks;
     newBodyBlocks[1].element.options = projBlocks;
 
-    console.log(newBodyBlocks);
+    //TODO find way on system change, clear previous project if one was selected
+    //body.view['state']['values']['block_project']['!textProject']['selected_option'] = null;
+
+    const adding = body.view.private_metadata === "adding";
+    console.log('userDialogViewIds: ' + userDialogViewIds[body.user.id])
+
     const result = await client.views.update({
-      view_id: userViewId,
+      view_id: userDialogViewIds[body.user.id], //update last used viewId store for user
       view: {
         type: 'modal',
         // View identifier
-        callback_id: 'view_add',
+        callback_id: adding ? 'view_add' : 'view_edit',
         title: {
           type: 'plain_text',
-          text: 'Add some time'
+          text: adding ? 'Add some time' : 'Edit some time'
         },
         blocks: newBodyBlocks,//body.view.blocks,
-        submit: body.view.submit
+        submit: body.view.submit,
+        private_metadata: body.view.private_metadata
       }
     });
-
-
+    userDialogViewIds[body.user.id] = result.view.id;
 
   } catch (error) {
     logger.error(error);
     // handle error
   }
 });
+/*
 app.action('!textProject', async ({ ack, body, logger }) => {
   try {
     await ack();
@@ -290,6 +356,7 @@ app.action('!textAction', async ({ ack, action, body, logger }) => {
     // handle error
   }
 });
+*/
 app.event("message", async (event) => {
   console.log("************MESSAGE************");
   if (!event.subtype && !event.bot_id) {
@@ -324,6 +391,7 @@ app.action('!dateChange', async ({ ack, action, client, body, logger }) => {
         blocks: getBlocksForUser(body.user.id, tasks, action.selected_date)
       }
     });
+    userHomeViewIds[body.user.id] = action.selected_date;
 
   } catch (error) {
     logger.error(error);
@@ -371,9 +439,8 @@ function getBlocksForUser(slackId, tasks, searchDate) {
     taskProject = task.project_id ? availableProjects.find(s => s.project_id === task.project_id) : null;
     taskAction = availableActions.find(s => s.action_id === task.action_id);
 
-    console.log(taskSystem.system_name + " " + taskProject.project_name + " " + taskAction.action_name);
-    console.log("System: *" + taskSystem.system_name + "*\nProject: *" + taskProject ? taskProject.project_name : '' + "*\nAction: *" + taskAction.action_name + "*\nHours: *" + task.hours + "*\nDesc: *" + task.description + "*");
-
+    //console.log(taskSystem.system_name + " " + taskProject.project_name + " " + taskAction.action_name);
+    //console.log("System: *" + taskSystem.system_name + "*\nProject: *" + taskProject ? taskProject.project_name : '' + "*\nAction: *" + taskAction.action_name + "*\nHours: *" + task.hours + "*\nDesc: *" + task.description + "*");
 
     blocks.push(
       {
@@ -438,16 +505,27 @@ function getProjectBlocksForSystem(systemId) {
   let projs = availableProjects.filter(a => -1 !== a.allowed_systems.indexOf(systemId));
   let projBlocks = [];
 
-  for (let p of projs) {
-    projBlocks.push({
-      "text": {
-        "type": "plain_text",
-        "text": p.project_name
-      },
-      "value": p.project_id.toString()
-    })
+  if (projs.length > 0) {
 
+    for (let p of projs) {
+      projBlocks.push({
+        "text": {
+          "type": "plain_text",
+          "text": p.project_name
+        },
+        "value": p.project_id.toString()
+      })
+
+    }
   }
+  projBlocks.push({
+    "text": {
+      "type": "plain_text",
+      "text": "<None>"
+    },
+    "value": '-1'
+  });
+
   return projBlocks;
 }
 
