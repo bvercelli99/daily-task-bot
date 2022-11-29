@@ -25,7 +25,7 @@ TABLESPACE pg_default;
 ALTER TABLE IF EXISTS timebot.employees
     OWNER to postgres;
 
---INSERT INTO timebot.employees(employee_name, slack_id) VALUES ('brianv','U02U0UX30');
+
 ----------------------------------------------------
 CREATE TABLE IF NOT EXISTS timebot.systems
 (
