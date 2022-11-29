@@ -69,7 +69,7 @@ app.view('view_add', async ({ ack, body, view, client, logger }) => {
   });
 
   //write to db, update current tasks on app_home_opened
-  let newTaskId = await db.addTaskForSlackUser(body.user.id, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), hours, desc, taskDate);
+  let newTaskId = await db.addTaskForSlackUser(body.user.id, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), parseInt(hours), desc, taskDate);
   //let tasks = await db.getTasksForDateByUserSlackId(taskDate, body.user.id);
 
   try {
@@ -108,7 +108,7 @@ app.view('view_edit', async ({ ack, body, view, client, logger }) => {
   await ack();
   const system = view['state']['values']['block_system']['!textSystem']['selected_option']["value"];
   const selectedProjectId = view['state']['values']['block_project']['!textProject']['selected_option'];
-  const project = (selectedProjectId === null ? null : (selectedProjectId["value"] === -1 ? null : selectedProjectId["value"]));
+  const project = (selectedProjectId === null ? null : (selectedProjectId["value"] === '-1' ? null : selectedProjectId["value"]));
   const action = view['state']['values']['block_action']['!textAction']['selected_option']["value"];
   const hours = view['state']['values']['block_hours']['action_hours']['value'];
   const desc = view['state']['values']['block_desc']['action_desc']['value'];
@@ -124,7 +124,7 @@ app.view('view_edit', async ({ ack, body, view, client, logger }) => {
     */
     const taskId = meta.split("_").length > 1 ? parseInt(meta.split("_")[1]) : -1;
     //write to db to edit existing task, update current tasks on app_home_opened
-    const updatedTaskId = await db.editTaskForSlackUser(body.user.id, taskId, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), hours, desc);
+    const updatedTaskId = await db.editTaskForSlackUser(body.user.id, taskId, parseInt(system), null === project ? null : parseInt(project), parseInt(action), parseInt(hours), desc);
 
     await refreshHomeViewForUser(client, taskDate, body.user.id, logger);
 

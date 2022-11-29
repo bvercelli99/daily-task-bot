@@ -184,6 +184,7 @@ const editTaskForSlackUser = (slackId, taskId, systemId, projectId, actionId, ho
       if (error) {
         reject(error);
       }
+      console.log(results);
       resolve(results.rows[0].task_id);
     });
   });
