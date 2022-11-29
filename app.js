@@ -50,6 +50,7 @@ app.event('app_home_opened', async ({ event, client, body, context, logger }) =>
   }
   catch (error) {
     console.error(error);
+    logger.error(error);
   }
 });
 
@@ -64,12 +65,8 @@ app.view('view_add', async ({ ack, body, view, client, logger }) => {
   const meta = body.view.private_metadata;
   const taskDate = userHomeViewIds[body.user.id];
 
-  console.log({
-    system, project, action, hours, desc, meta, userHomeViewIds
-  });
-
   //write to db, update current tasks on app_home_opened
-  let newTaskId = await db.addTaskForSlackUser(body.user.id, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), parseInt(hours), desc, taskDate);
+  let newTaskId = await db.addTaskForSlackUser(body.user.id, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), parseFloat(hours), desc, taskDate);
   //let tasks = await db.getTasksForDateByUserSlackId(taskDate, body.user.id);
 
   try {
@@ -77,21 +74,6 @@ app.view('view_add', async ({ ack, body, view, client, logger }) => {
     await client.chat.postMessage({
       channel: body['user']['id'],
       text: "Dude you did it!"
-    });
-    */
-    /* view.publish is the method that your app uses to push a view to the Home tab */
-
-    /*
-    const result = await client.views.publish({
-
-      user_id: body.user.id,
-
-      
-      view: {
-        type: 'home',
-        callback_id: 'home_view',        
-        blocks: getBlocksForUser(body.user.id, tasks, taskDate)
-      }
     });
     */
 
@@ -124,7 +106,7 @@ app.view('view_edit', async ({ ack, body, view, client, logger }) => {
     */
     const taskId = meta.split("_").length > 1 ? parseInt(meta.split("_")[1]) : -1;
     //write to db to edit existing task, update current tasks on app_home_opened
-    const updatedTaskId = await db.editTaskForSlackUser(body.user.id, taskId, parseInt(system), null === project ? null : parseInt(project), parseInt(action), parseInt(hours), desc);
+    const updatedTaskId = await db.editTaskForSlackUser(body.user.id, taskId, parseInt(system), null === project ? null : parseInt(project), parseInt(action), parseFloat(hours), desc);
 
     await refreshHomeViewForUser(client, taskDate, body.user.id, logger);
 
@@ -274,7 +256,6 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
 
     //
     userDialogViewIds[body.user.id] = result.view.id;
-    console.log(userDialogViewIds);
 
   } catch (error) {
     logger.error(error);
@@ -358,8 +339,6 @@ app.action('!dateChange', async ({ ack, action, client, body, logger }) => {
     await ack();
     let tasks = await db.getTasksForDateByUserSlackId(action.selected_date, body.user.id);
 
-    console.log(body.user.name + " changed a date - " + action.selected_date);
-
     const result = await client.views.publish({
 
       /* the user that opened your app's app home */
@@ -406,7 +385,6 @@ app.action('!editTask', async ({ ack, action, client, body, logger }) => {
     const userTask = await db.getTaskByTaskId(body.user.id, parseInt(action.value));
     const taskDate = userHomeViewIds[body.user.id];
     const projBlocks = getProjectBlocksForSystem(userTask.system_id);
-    console.log(userTask);
 
     const systems = [];
     for (let sys of availableSystems) {
@@ -557,11 +535,9 @@ app.action('!editTask', async ({ ack, action, client, body, logger }) => {
       },
     });
 
-
-    //await refreshHomeViewForUser(client, taskDate, body.user.id, logger);
   }
   catch (error) {
-
+    logger.error(error);
   }
 
 });
@@ -611,7 +587,6 @@ function getBlocksForUser(slackId, tasks, searchDate) {
     taskProject = task.project_id ? availableProjects.find(s => s.project_id === task.project_id) : null;
     taskAction = availableActions.find(s => s.action_id === task.action_id);
 
-    //console.log(taskSystem.system_name + " " + taskProject.project_name + " " + taskAction.action_name);
     //console.log("System: *" + taskSystem.system_name + "*\nProject: *" + taskProject ? taskProject.project_name : '' + "*\nAction: *" + taskAction.action_name + "*\nHours: *" + task.hours + "*\nDesc: *" + task.description + "*");
     dailyHours += task.hours;
 

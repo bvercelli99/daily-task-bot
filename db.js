@@ -163,7 +163,6 @@ const addTaskForSlackUser = (slackId, systemId, projectId, actionId, hours, desc
 };
 
 const editTaskForSlackUser = (slackId, taskId, systemId, projectId, actionId, hours, description) => {
-  console.log({ slackId, taskId, systemId, projectId, actionId, hours, description });
   return new Promise((resolve, reject) => {
     pool.query(
       "WITH employee as ( " +
@@ -184,7 +183,6 @@ const editTaskForSlackUser = (slackId, taskId, systemId, projectId, actionId, ho
       if (error) {
         reject(error);
       }
-      console.log(results);
       resolve(results.rows[0].task_id);
     });
   });
