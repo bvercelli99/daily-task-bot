@@ -105,12 +105,6 @@ app.view('view_edit', async ({ ack, body, view, client, logger }) => {
   const taskDate = userHomeViewIds[body.user.id];
 
   try {
-    /*
-    await client.chat.postMessage({
-      channel: body['user']['id'],
-      text: "Dude you did it!"
-    });
-    */
     const taskId = meta.split("_").length > 1 ? parseInt(meta.split("_")[1]) : -1;
     //write to db to edit existing task, update current tasks on app_home_opened
     const updatedTaskId = await db.editTaskForSlackUser(body.user.id, taskId, parseInt(system), null === project ? null : parseInt(project), parseInt(action), parseFloat(hours), desc);
