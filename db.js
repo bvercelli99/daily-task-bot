@@ -5,6 +5,13 @@ const pool = new Pool({
   database: process.env.PG_DATABASE || 'time_log',
   password: process.env.PG_PASSWORD || '',
   port: process.env.PG_PORT || 54131,
+});
+const ptoPool = new Pool({
+  user: process.env.PTO_PG_USER || 'postgres',
+  host: process.env.PTO_PG_HOST || '192.168.3.206',
+  database: process.env.PTO_PG_DATABASE || 'pto',
+  password: process.env.PTO_PG_PASSWORD || '',
+  port: process.env.PTO_PG_PORT || 54131,
 })
 
 const getSystems = () => {
@@ -46,10 +53,10 @@ const getActions = () => {
   });
 };
 
-const getEmployees = () => {
+const getEmployeesForNotifications = () => {
   return new Promise((resolve, reject) => {
     pool.query(
-      "SELECT employee_id, employee_name, slack_id FROM timebot.employees WHERE date_deleted IS NULL ORDER BY employee_name", (error, results) => {
+      "SELECT employee_id, employee_name, slack_id FROM timebot.employees WHERE date_deleted IS NULL AND notifications = true ORDER BY employee_name", (error, results) => {
         if (error) {
           reject(error);
         }
@@ -207,8 +214,57 @@ const deleteTaskForSlackUser = (slackId, taskId) => {
   });
 };
 
+const getTotalHoursForEmployeeByDate = (slackId, date) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "WITH employee as ( " +
+      "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
+      ") " +
+      "SELECT sum(hours) " +
+      "FROM employee e, timebot.employee_tasks et " +
+      "WHERE et.employee_id = e.employee_id AND date_created = $2 AND et.date_deleted IS NULL ;", [
+      slackId,
+      date
+    ], (error, results) => {
+      if (error) {
+        reject(error);
+      }
+      resolve(results.rows[0].sum);
+    });
+  });
+};
+
+const getIsUserOnPto = (slackId, formattedDate) => {
+  return new Promise((resolve, reject) => {
+    ptoPool.query("WITH employee as ( " +
+      "SELECT employee_id FROM pto.employees WHERE slack_id = $1" +
+      "), " +
+      "requests as ( " +
+      "SELECT request_id FROM pto.requests " +
+      "WHERE requested_by = (SELECT employee_id FROM employee) " +
+      "AND date_requested >= now()::date - INTERVAL '1 month' AND  date_requested <= now()::date + INTERVAL '1 month' " +
+      "AND status = 'approved' " +
+      ") " +
+      "SELECT true FROM pto.request_days rd " +
+      "WHERE rd.date = $2 AND request_id IN (SELECT request_id FROM requests) ", [
+      slackId,
+      formattedDate
+    ], (error, results) => {
+      if (error) {
+        reject(error);
+      }
+      if (results) {
+        if (results.rows[0]) {
+          resolve(true);
+        }
+      }
+      resolve(false);
+    });
+  });
+};
+
 module.exports = {
-  getEmployees,
+  getEmployeesForNotifications,
   getEmployeeBySlackId,
   getEmployeeById,
   getTasksForDateByUserSlackId,
@@ -218,5 +274,7 @@ module.exports = {
   addTaskForSlackUser,
   editTaskForSlackUser,
   deleteTaskForSlackUser,
-  getTaskByTaskId
+  getTaskByTaskId,
+  getTotalHoursForEmployeeByDate,
+  getIsUserOnPto
 }

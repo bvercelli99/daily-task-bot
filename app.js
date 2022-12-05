@@ -1,8 +1,10 @@
 // Require the Bolt package (github.com/slackapi/bolt)
 require('dotenv').config({ path: __dirname + '/.env' });
 const db = require('./db');
+const fs = require('fs');
 
 const { App } = require("@slack/bolt");
+const { format } = require('path');
 
 const app = new App({
   token: process.env.BOT_TOKEN,
@@ -11,12 +13,15 @@ const app = new App({
   logLevel: 'debug',
   socketMode: true
 });
+const MINIMUM_HOURS = 6;
 
 let availableSystems = null;
 let availableProjects = null;
 let availableActions = null;
 
-let activeUsers = {};
+let activeUsers = [];
+let holidays = [];
+
 let userDialogViewIds = {};
 let userHomeViewIds = {};
 
@@ -25,13 +30,32 @@ let userHomeViewIds = {};
   await app.start(process.env.PORT || 3000);
   console.log('⚡️ Bolt app is running!');
 
-  availableSystems = await db.getSystems();
-  availableProjects = await db.getProjects();
-  availableActions = await db.getActions();
+  try {
+    availableSystems = await db.getSystems();
+    availableProjects = await db.getProjects();
+    availableActions = await db.getActions();
+    activeUsers = await db.getEmployeesForNotifications();
+
+    const holidaysJson = fs.readFileSync(process.env.HOLIDAYS_JSON);
+    holidays = JSON.parse(holidaysJson);
+    console.log(holidays);
+
+    //setupIntervalForMessaging();
+
+
+  }
+  catch (error) {
+    console.error(error);
+  }
+
+
+
+
 
   //get all systems, get all projects, get all actions
 
-  //get all user's who are member of app/channel
+  //get all user's who are member of app/channel, that allow for messaging
+  //get all holidays in json file
   //get all user's who have PTO on current day
   //get all 
 
@@ -39,9 +63,6 @@ let userHomeViewIds = {};
 })();
 
 app.event('app_home_opened', async ({ event, client, body, context, logger }) => {
-
-  activeUsers[event.user] = [];
-
   const a = new Date();
   let stringDate = a.getFullYear() + "-" + (a.getMonth() + 1) + "-" + a.getDate();
 
@@ -694,6 +715,49 @@ function getProjectBlocksForSystem(systemId) {
   });
 
   return projBlocks;
+}
+
+function setupIntervalForMessaging() {
+  setTimeout(setupIntervalForMessaging, 1000 * 60 * 60 * 24); //call this again in exactly one day from now...
+
+  checkToNotifyUsers();
+}
+
+async function checkToNotifyUsers() {
+  if (!isTodaySusaHolidayOrWeekend()) { //not a holiday or weekend
+
+    for (u of activeUsers) {
+      const t = new Date();
+      const formatted = t.getFullYear() + "-" + (t.getMonth() + 1 >= 10 ? t.getMonth() + 1 : "0" + (t.getMonth() + 1)) + "-" + (t.getDate() >= 10 ? t.getDate() : "0" + t.getDate());
+
+      const userOnPto = await db.getIsUserOnPto(u.slack_id, formatted);
+      if (!userOnPto) { //user not on PTO
+
+        const userHrs = await db.getTotalHoursForEmployeeByDate(u.slack_id, formatted);
+        if (userHrs < MINIMUM_HOURS) {
+
+          console.log('send message to user: ' + u.employee_name);
+
+          /*  
+          await app.client.chat.postMessage({
+            channel: u.slack_id,
+            text: "Hey, guess what time it is... time to log some freakin' tasks!"
+          });
+          */
+        }
+      }
+    }
+  }
+
+
+
+}
+
+function isTodaySusaHolidayOrWeekend() {
+  const t = new Date();
+  const formatted = t.getFullYear() + "-" + (t.getMonth() + 1 >= 10 ? t.getMonth() + 1 : "0" + (t.getMonth() + 1)) + "-" + (t.getDate() >= 10 ? t.getDate() : "0" + t.getDate());
+  console.log('isHoliday or weekend? ' + (null != holidays.find(m => m.date === formatted) || (t.getDay() == 0 || t.getDay() == 6)));
+  return null != holidays.find(m => m.date === formatted) || (t.getDay() == 0 || t.getDay() == 6);
 }
 
 async function refreshHomeViewForUser(client, selectedDate, userId, logger) {
