@@ -38,27 +38,13 @@ let userHomeViewIds = {};
 
     const holidaysJson = fs.readFileSync(process.env.HOLIDAYS_JSON);
     holidays = JSON.parse(holidaysJson);
-    console.log(holidays);
 
-    //setupIntervalForMessaging();
-
+    setupIntervalForMessaging();
 
   }
   catch (error) {
     console.error(error);
   }
-
-
-
-
-
-  //get all systems, get all projects, get all actions
-
-  //get all user's who are member of app/channel, that allow for messaging
-  //get all holidays in json file
-  //get all user's who have PTO on current day
-  //get all 
-
 
 })();
 
@@ -718,12 +704,20 @@ function getProjectBlocksForSystem(systemId) {
 }
 
 function setupIntervalForMessaging() {
-  setTimeout(setupIntervalForMessaging, 1000 * 60 * 60 * 24); //call this again in exactly one day from now...
+  //get current time at server startup...
+  const now = new Date();
+  let msgTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 15, 30, 0, 0);
 
-  checkToNotifyUsers();
+  if (msgTime - now < 0) { //we're past 3:30pm on server startup so set it up for tomorrow
+    msgTime.setDate(msgTime.getDate() + 1);
+  }
+  console.log('notify users in: ' + ((((msgTime - now) / 1000) / 60) / 60) + " hours");
+  setTimeout(checkToNotifyUsers, msgTime - now);
 }
 
 async function checkToNotifyUsers() {
+  setTimeout(checkToNotifyUsers, 1000 * 60 * 60 * 24); //call this again in exactly one day from now...
+
   if (!isTodaySusaHolidayOrWeekend()) { //not a holiday or weekend
 
     for (u of activeUsers) {
@@ -738,12 +732,11 @@ async function checkToNotifyUsers() {
 
           console.log('send message to user: ' + u.employee_name);
 
-          /*  
           await app.client.chat.postMessage({
             channel: u.slack_id,
-            text: "Hey, guess what time it is... time to log some freakin' tasks!"
+            text: "Hey! You're doing great.... except at logging time for today :grin:"
           });
-          */
+
         }
       }
     }
@@ -756,7 +749,6 @@ async function checkToNotifyUsers() {
 function isTodaySusaHolidayOrWeekend() {
   const t = new Date();
   const formatted = t.getFullYear() + "-" + (t.getMonth() + 1 >= 10 ? t.getMonth() + 1 : "0" + (t.getMonth() + 1)) + "-" + (t.getDate() >= 10 ? t.getDate() : "0" + t.getDate());
-  console.log('isHoliday or weekend? ' + (null != holidays.find(m => m.date === formatted) || (t.getDay() == 0 || t.getDay() == 6)));
   return null != holidays.find(m => m.date === formatted) || (t.getDay() == 0 || t.getDay() == 6);
 }
 
