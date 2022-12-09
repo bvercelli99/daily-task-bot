@@ -40,7 +40,6 @@ let userHomeViewIds = {};
     holidays = JSON.parse(holidaysJson);
 
     setupIntervalForMessaging();
-
   }
   catch (error) {
     console.error(error);
@@ -50,7 +49,8 @@ let userHomeViewIds = {};
 
 app.event('app_home_opened', async ({ event, client, body, context, logger }) => {
   const a = new Date();
-  let stringDate = a.getFullYear() + "-" + (a.getMonth() + 1) + "-" + a.getDate();
+  //let stringDate = a.getFullYear() + "-" + (a.getMonth() + 1) + "-" + a.getDate();
+  const stringDate = a.getFullYear() + "-" + (a.getMonth() + 1 >= 10 ? a.getMonth() + 1 : "0" + (a.getMonth() + 1)) + "-" + (a.getDate() >= 10 ? a.getDate() : "0" + a.getDate());
 
   try {
     await refreshHomeViewForUser(client, stringDate, event.user, logger);
@@ -559,7 +559,7 @@ function getBlocksForUser(slackId, tasks, searchDate) {
     },
     {
       "type": "actions",
-      "block_id": "actionblock789",
+      "block_id": (Math.random() + 1).toString(36).substring(7), //added this so it reloads date section every time. Slack was hanging on to last used date for user at times...
       "elements": [
         {
           "type": "datepicker",
@@ -725,10 +725,11 @@ async function checkToNotifyUsers() {
         if (userHrs < MINIMUM_HOURS) {
 
           console.log('send message to user: ' + u.employee_name);
+          const quip = await db.getRandomQuip();
 
           await app.client.chat.postMessage({
             channel: u.slack_id,
-            text: "Hey! You're doing great.... except at logging time for today :grin:"
+            text: quip
           });
 
         }

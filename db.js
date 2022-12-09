@@ -263,6 +263,21 @@ const getIsUserOnPto = (slackId, formattedDate) => {
   });
 };
 
+const getRandomQuip = () => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "SELECT quip_text FROM timebot.quips OFFSET random() * (SELECT count(*) FROM timebot.quips) LIMIT 1;", (error, results) => {
+        if (error) {
+          reject(error);
+        }
+        resolve(results.rows[0].quip_text);
+      });
+  });
+};
+
+
+//SELECT quip_text FROM timebot.quips OFFSET random() * (SELECT count(*) FROM timebot.quips) LIMIT 1 ;
+
 module.exports = {
   getEmployeesForNotifications,
   getEmployeeBySlackId,
@@ -276,5 +291,6 @@ module.exports = {
   deleteTaskForSlackUser,
   getTaskByTaskId,
   getTotalHoursForEmployeeByDate,
-  getIsUserOnPto
+  getIsUserOnPto,
+  getRandomQuip
 }
