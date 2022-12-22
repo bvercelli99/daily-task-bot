@@ -268,7 +268,7 @@ const getIsUserOnPto = (slackId, formattedDate) => {
 const getRandomQuip = () => {
   return new Promise((resolve, reject) => {
     pool.query(
-      "SELECT quip_text FROM timebot.quips OFFSET random() * (SELECT count(*) - 1 FROM timebot.quips) LIMIT 1 ", (error, results) => {
+      "SELECT quip_text FROM timebot.quips ORDER BY random() LIMIT 1 ", (error, results) => {
         if (error) {
           reject(error);
         }
