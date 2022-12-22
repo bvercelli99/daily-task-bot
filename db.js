@@ -110,7 +110,7 @@ const getTasksForDateByUserSlackId = (date, slackId) => {
       "WITH employee as ( " +
       "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
       ") " +
-      "SELECT task_id, et.employee_id, system_id, project_id, action_id, hours, description, date_created " +
+      "SELECT task_id, et.employee_id, system_id, project_id, action_id, hours, description, date_created, unplanned " +
       "FROM employee e, timebot.employee_tasks et " +
       "WHERE et.employee_id = e.employee_id AND date_created = $2 AND et.date_deleted IS NULL " +
       "ORDER BY task_id ", [
@@ -130,7 +130,7 @@ const getTaskByTaskId = (slackId, taskId) => {
       "WITH employee as ( " +
       "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
       ") " +
-      "SELECT task_id, et.employee_id, system_id, project_id, action_id, hours, description, date_created " +
+      "SELECT task_id, et.employee_id, system_id, project_id, action_id, hours, description, date_created, unplanned " +
       "FROM employee e, timebot.employee_tasks et " +
       "WHERE et.employee_id = e.employee_id AND task_id = $2 AND et.date_deleted IS NULL ", [
       slackId, taskId
@@ -143,7 +143,7 @@ const getTaskByTaskId = (slackId, taskId) => {
   });
 };
 
-const addTaskForSlackUser = (slackId, systemId, projectId, actionId, hours, description, date) => {
+const addTaskForSlackUser = (slackId, systemId, projectId, actionId, hours, description, date, unplanned) => {
 
   return new Promise((resolve, reject) => {
     pool.query(
@@ -151,15 +151,16 @@ const addTaskForSlackUser = (slackId, systemId, projectId, actionId, hours, desc
       "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
       ") " +
       "INSERT INTO timebot.employee_tasks(" +
-      "employee_id, system_id, project_id, action_id, hours, description, date_created) " +
-      "VALUES ((SELECT employee_id FROM employee), $2, $3, $4, $5, $6, $7) RETURNING task_id;", [
+      "employee_id, system_id, project_id, action_id, hours, description, date_created, unplanned) " +
+      "VALUES ((SELECT employee_id FROM employee), $2, $3, $4, $5, $6, $7, $8) RETURNING task_id;", [
       slackId,
       systemId,
       projectId,
       actionId,
       hours,
       description,
-      date
+      date,
+      unplanned
     ], (error, results) => {
       if (error) {
         reject(error);
@@ -169,14 +170,14 @@ const addTaskForSlackUser = (slackId, systemId, projectId, actionId, hours, desc
   });
 };
 
-const editTaskForSlackUser = (slackId, taskId, systemId, projectId, actionId, hours, description) => {
+const editTaskForSlackUser = (slackId, taskId, systemId, projectId, actionId, hours, description, unplanned) => {
   return new Promise((resolve, reject) => {
     pool.query(
       "WITH employee as ( " +
       "SELECT employee_id FROM timebot.employees WHERE slack_id = $1 " +
       ") " +
       "UPDATE timebot.employee_tasks " +
-      "SET system_id = $3, project_id = $4, action_id = $5, hours = $6, description = $7 " +
+      "SET system_id = $3, project_id = $4, action_id = $5, hours = $6, description = $7, unplanned = $8 " +
       "WHERE employee_id = (SELECT employee_id FROM employee) AND task_id = $2 " +
       "RETURNING task_id;", [
       slackId,
@@ -185,7 +186,8 @@ const editTaskForSlackUser = (slackId, taskId, systemId, projectId, actionId, ho
       projectId,
       actionId,
       hours,
-      description
+      description,
+      unplanned
     ], (error, results) => {
       if (error) {
         reject(error);

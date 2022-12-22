@@ -69,11 +69,13 @@ app.view('view_add', async ({ ack, body, view, client, logger }) => {
   const action = view['state']['values']['block_action']['!textAction']['selected_option']["value"];
   const hours = view['state']['values']['block_hours']['action_hours']['value'];
   const desc = view['state']['values']['block_desc']['action_desc']['value'];
+  const unplanned = view['state']['values']['block_unplanned']['!unplanned']["selected_options"];//['value'];
+
   const meta = body.view.private_metadata;
   const taskDate = userHomeViewIds[body.user.id];
 
   //write to db, update current tasks on app_home_opened
-  let newTaskId = await db.addTaskForSlackUser(body.user.id, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), parseFloat(hours), desc, taskDate);
+  let newTaskId = await db.addTaskForSlackUser(body.user.id, parseInt(system), null != project ? parseInt(project) : null, parseInt(action), parseFloat(hours), desc, taskDate, unplanned.length > 0);
   //let tasks = await db.getTasksForDateByUserSlackId(taskDate, body.user.id);
 
   try {
@@ -101,13 +103,14 @@ app.view('view_edit', async ({ ack, body, view, client, logger }) => {
   const action = view['state']['values']['block_action']['!textAction']['selected_option']["value"];
   const hours = view['state']['values']['block_hours']['action_hours']['value'];
   const desc = view['state']['values']['block_desc']['action_desc']['value'];
+  const unplanned = view['state']['values']['block_unplanned']['!unplanned']["selected_options"];//['value'];
   const meta = body.view.private_metadata;
   const taskDate = userHomeViewIds[body.user.id];
 
   try {
     const taskId = meta.split("_").length > 1 ? parseInt(meta.split("_")[1]) : -1;
     //write to db to edit existing task, update current tasks on app_home_opened
-    const updatedTaskId = await db.editTaskForSlackUser(body.user.id, taskId, parseInt(system), null === project ? null : parseInt(project), parseInt(action), parseFloat(hours), desc);
+    const updatedTaskId = await db.editTaskForSlackUser(body.user.id, taskId, parseInt(system), null === project ? null : parseInt(project), parseInt(action), parseFloat(hours), desc, unplanned.length > 0);
 
     await refreshHomeViewForUser(client, taskDate, body.user.id, logger);
 
@@ -243,8 +246,27 @@ app.action('!addTime', async ({ ack, client, body, logger }) => {
             element: {
               type: 'plain_text_input',
               action_id: 'action_desc',
-              multiline: true
+              multiline: false
             }
+          },
+          {
+            "type": "actions",
+            "block_id": "block_unplanned",
+            "elements": [
+              {
+                "type": "checkboxes",
+                "options": [
+                  {
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*Unplanned*"
+                    },
+                    "value": "value-0"
+                  },
+                ],
+                "action_id": "!unplanned"
+              }
+            ]
           }
         ],
         submit: {
@@ -379,6 +401,15 @@ app.action('!deleteTask', async ({ ack, action, client, body, logger }) => {
 
 });
 
+app.action('!unplanned', async ({ ack, action, client, body, logger }) => {
+  try {
+    await ack();
+  }
+  catch (error) {
+
+  }
+});
+
 app.action('!editTask', async ({ ack, action, client, body, logger }) => {
   try {
     await ack();
@@ -386,7 +417,7 @@ app.action('!editTask', async ({ ack, action, client, body, logger }) => {
     const userTask = await db.getTaskByTaskId(body.user.id, parseInt(action.value));
     const taskDate = userHomeViewIds[body.user.id];
     const projBlocks = getProjectBlocksForSystem(userTask.system_id);
-
+    console.log(userTask);
     const systems = [];
     for (let sys of availableSystems) {
       systems.push({
@@ -408,6 +439,30 @@ app.action('!editTask', async ({ ack, action, client, body, logger }) => {
         "value": act.action_id.toString()
       });
     }
+
+    var unplannedElmt = {
+      "type": "checkboxes",
+      "options": [
+        {
+          "text": {
+            "type": "mrkdwn",
+            "text": "*Unplanned*"
+          },
+          "value": "value-0"
+        },
+      ],
+      "action_id": "!unplanned"
+    };
+    if (userTask.unplanned) {
+      unplannedElmt["initial_options"] = [{
+        "text": {
+          "type": "mrkdwn",
+          "text": "*Unplanned*"
+        },
+        "value": "value-0"
+      }];
+    }
+
     const result = await client.views.open({
 
       trigger_id: body.trigger_id,
@@ -523,9 +578,14 @@ app.action('!editTask', async ({ ack, action, client, body, logger }) => {
             element: {
               type: 'plain_text_input',
               action_id: 'action_desc',
-              multiline: true,
+              multiline: false,
               initial_value: userTask.description ? userTask.description : ""
             }
+          },
+          {
+            "type": "actions",
+            "block_id": "block_unplanned",
+            "elements": [unplannedElmt]
           }
         ],
         submit: {
