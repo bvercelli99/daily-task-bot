@@ -38,9 +38,7 @@ let userHomeViewIds = {};
 
     const holidaysJson = fs.readFileSync(process.env.HOLIDAYS_JSON);
     holidays = JSON.parse(holidaysJson);
-    console.log(holidays);
     setupIntervalForMessaging();
-    checkToNotifyUsers();
   }
   catch (error) {
     console.error(error);
