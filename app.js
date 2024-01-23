@@ -610,7 +610,7 @@ function getBlocksForUser(slackId, tasks, searchDate) {
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": ":wave: Hey *<@" + slackId + ">*, let's log some time!"
+        "text": ":wave: Hey *<@" + slackId + ">*, let's log some time (for special projects)!"
       }
     },
     {
@@ -771,7 +771,7 @@ function setupIntervalForMessaging() {
 async function checkToNotifyUsers() {
   setTimeout(checkToNotifyUsers, 1000 * 60 * 60 * 24); //call this again in exactly one day from now...
 
-  if (!isTodaySusaHolidayOrWeekend()) { //not a holiday or weekend
+  if (!isTodaySusaHoliday() && isTodayFridayOrMonday()) { //not a SUSA holiday AND only on Mon or Fri
 
     for (u of activeUsers) {
       const t = new Date();
@@ -800,10 +800,15 @@ async function checkToNotifyUsers() {
 
 }
 
-function isTodaySusaHolidayOrWeekend() {
+function isTodaySusaHoliday() {
   const t = new Date();
   const formatted = t.getFullYear() + "-" + (t.getMonth() + 1 >= 10 ? t.getMonth() + 1 : "0" + (t.getMonth() + 1)) + "-" + (t.getDate() >= 10 ? t.getDate() : "0" + t.getDate());
-  return null != holidays.find(m => m.date === formatted) || (t.getDay() == 0 || t.getDay() == 6);
+  return null != holidays.find(m => m.date === formatted);
+}
+
+function isTodayFridayOrMonday() {
+  const t = new Date();
+  return (t.getDay() == 1 || t.getDay() == 5);
 }
 
 async function refreshHomeViewForUser(client, selectedDate, userId, logger) {
